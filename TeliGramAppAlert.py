@@ -143,6 +143,7 @@ def scan_momentum(symbol, exchange, timeframe):
                 results['volume'] = alert_volume
                 results['time'] = formatted_ist
                 results['symbol'] = symbol
+                results['timeframe'] = timeframe  
                 return results
 
         is_crossover = (prev_9 <= prev_20) and (curr_9 > curr_20)
@@ -153,6 +154,7 @@ def scan_momentum(symbol, exchange, timeframe):
                 results['volume'] = alert_volume
                 results['time'] = formatted_ist
                 results['symbol'] = symbol
+                results['timeframe'] = timeframe  
                 return results
                 
     except Exception as e:
@@ -171,7 +173,7 @@ def main():
         }
     })
     
-    target_tf = '5m'
+    target_tf = '1h'
     
     print("=" * 60)
     print("🚀 DELTA INDIA SCANNER WITH TELEGRAM ALERTS")
@@ -204,6 +206,7 @@ def main():
             alert_message = (
                 f"🚨 <b>DELTA ALERT</b> | {app_ticker}\n"
                 f"📊 {setup['type']}\n"
+                f"⏱️ <b>Timeframe:</b> {setup['timeframe']}\n"
                 f"💰 <b>Price:</b> {setup['close']:.4f}\n"
                 f"📈 <b>Volume:</b> {setup['volume']:.2f}\n"
                 f"🕐 <b>Time:</b> {setup['time']}"
