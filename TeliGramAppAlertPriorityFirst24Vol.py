@@ -336,29 +336,29 @@ def main(target_tf='15m'):
     )
     send_telegram_alert(summary)
 
-# if __name__ == "__main__":
-#     main(target_tf='15m')
-
-# For GithubActions
 if __name__ == "__main__":
-    # Continuous live loop structure for persistent web environments
-    INTERVAL_SECONDS = 900 # 15 minutes
+    main(target_tf='15m')
+
+# # For GithubActions
+# if __name__ == "__main__":
+#     # Continuous live loop structure for persistent web environments
+#     INTERVAL_SECONDS = 900 # 15 minutes
     
-    print("🌍 Hugging Face Container Engine Initialized Successfully.")
-    while True:
-        start_time = time.time()
-        current_run_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S IST')
-        print(f"🔄 Executing active scanning cycle at: {current_run_time}")
+#     print("🌍 Hugging Face Container Engine Initialized Successfully.")
+#     while True:
+#         start_time = time.time()
+#         current_run_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S IST')
+#         print(f"🔄 Executing active scanning cycle at: {current_run_time}")
         
-        try:
-            # Invokes your main matrix engine with 15-minute candles
-            main(target_tf='15m')
-        except Exception as e:
-            print(f"⚠️ Runtime execution error caught in main loop iteration: {e}")
+#         try:
+#             # Invokes your main matrix engine with 15-minute candles
+#             main(target_tf='15m')
+#         except Exception as e:
+#             print(f"⚠️ Runtime execution error caught in main loop iteration: {e}")
             
-        # Calculate process time to avoid interval drift
-        elapsed_time = time.time() - start_time
-        remaining_sleep = max(1, INTERVAL_SECONDS - elapsed_time)
+#         # Calculate process time to avoid interval drift
+#         elapsed_time = time.time() - start_time
+#         remaining_sleep = max(1, INTERVAL_SECONDS - elapsed_time)
         
-        print(f"😴 Cycle complete. Processing took {elapsed_time:.1f}s. Sleeping for {remaining_sleep:.1f}s...")
-        time.sleep(remaining_sleep)
+#         print(f"😴 Cycle complete. Processing took {elapsed_time:.1f}s. Sleeping for {remaining_sleep:.1f}s...")
+#         time.sleep(remaining_sleep)
