@@ -2,7 +2,7 @@ import ccxt
 import pandas as pd
 import time
 import requests
-from datetime import datetime, timezone
+from datetime import datetime
 
 # ========== TELEGRAM CONFIGURATION ==========
 
@@ -72,7 +72,33 @@ def send_telegram_alert_advanced(message):
         return False
 
 # ========== YOUR ORIGINAL FUNCTIONS ==========
+# it will scan all derivatives, including call/put options, futures, and perpetual swaps.
+# def fetch_all_delta_india_tickers(exchange):
+#     """Fetches all active perpetual contracts hosted on the Delta India cluster."""
+#     raw_markets = exchange.fetch_markets()
+    
+#     tradeable_pairs = []
+#     for m in raw_markets:
+#         is_derivative = (
+#             m.get('swap', False) or 
+#             m.get('future', False) or 
+#             m.get('linear', False) or
+#             (m.get('type') in ['swap', 'future', 'linear'])
+#         )
+#         is_active = m.get('active', True)
+        
+#         if is_derivative and is_active:
+#             symbol = m.get('symbol')
+#             raw_id = m.get('id', '')
+            
+#             clean_name = raw_id.replace('_', '').replace('-', '').replace('/', '').replace(':', '')
+            
+#             if (symbol, clean_name) not in tradeable_pairs:
+#                 tradeable_pairs.append((symbol, clean_name))
+                
+#     return tradeable_pairs
 
+# it will not scan call put options, only futures and perpetual swaps.
 def fetch_all_delta_india_tickers(exchange):
     """Fetches all active perpetual contracts hosted on the Delta India cluster."""
     raw_markets = exchange.fetch_markets()
@@ -90,6 +116,13 @@ def fetch_all_delta_india_tickers(exchange):
         
         # 2. EXPLICITLY BAN CALL/PUT OPTIONS
         is_option = m.get('option', False) or (m.get('type') == 'option')
+
+        # # 3. VERIFY QUOTE CURRENCY IS EITHER USDT OR USD
+        # quote = m.get('quote', '').upper()
+        # is_usd_or_usdt = (quote == 'USDT' or quote == 'USD')
+        
+        # # Only pass if it fits all rules
+        # if is_derivative and is_active and not is_option and is_usd_or_usdt:
         
         # Only pass if it IS a derivative, IS active, and IS NOT an option
         if is_derivative and is_active and not is_option:
@@ -163,6 +196,7 @@ def scan_momentum(symbol, exchange, timeframe):
             alert_type = 'BULLISH BREAKOUT 🚀'
 
         if alert_type:
+            # Safely fetch 24h rolling details via fast ticker API
             try:
                 ticker_data = exchange.fetch_ticker(symbol)
                 vol_24h = ticker_data.get('quoteVolume') or ticker_data.get('baseVolume', 0.0)
@@ -185,7 +219,7 @@ def scan_momentum(symbol, exchange, timeframe):
     return None
 
 # ========== MAIN FUNCTION WITH TELEGRAM INTEGRATION ==========
-def main(target_tf='15m', silent_mode=False):
+def main(target_tf='15m'):
     exchange = ccxt.delta({
         'enableRateLimit': True,
         'urls': {
@@ -196,50 +230,76 @@ def main(target_tf='15m', silent_mode=False):
         }
     })
     
-    print("=" * 60)
-    print(f"🚀 DELTA INDIA SCANNER | TIMEFRAME: {target_tf}")
-    print("=" * 60)
+    # target_tf = '15m'
+    target_tf = target_tf
     
-    # Only test connection on primary 15m run to prevent Telegram spam
-    if not silent_mode:
-        print("🔍 Testing Telegram connection...")
-        test_message = f"🤖 Delta Scanner online | Checking {target_tf} charts..."
-        send_telegram_alert(test_message)
-        print("-" * 60)
+    print("=" * 60)
+    print("🚀 DELTA INDIA SCANNER WITH TELEGRAM ALERTS")
+    print("=" * 60)
+    print(f"Connecting to Delta India servers...")
+    print(f"Target Timeframe: {target_tf}")
+    print(f"Telegram alerts will be sent to Chat ID: {CHAT_ID}")
+    print("-" * 60)
     
+    # Verify Telegram bot is working
+    print("🔍 Testing Telegram connection...")
+    test_message = "🤖 Delta Scanner Bot is online and ready!"
+    send_telegram_alert(test_message)
+    print("-" * 60)
+    
+    # 1. Define your high-priority coins here (use uppercase base symbols)
     PRIORITY_COINS = ['BTC', 'ETH', 'SOL', 'XRP', 'AAVE', 'LINK', 'XAUT', 'AVAX']
 
     pairs = fetch_all_delta_india_tickers(exchange)
     print(f"📊 Total Active Futures Pairs Found: {len(pairs)}")
     
+    # 2. Separate the pairs into Priority and Normal pools
     priority_pairs = []
     normal_pairs = []
     
     for ccxt_symbol, app_ticker in pairs:
+        # Extract the base coin (e.g., gets 'BTC' from 'BTC/USDT:USDT')
         base_asset = ccxt_symbol.split('/')[0].upper() if '/' in ccxt_symbol else app_ticker
         
+        # Check if this coin matches anything in your priority list
         if base_asset in PRIORITY_COINS:
             priority_pairs.append((ccxt_symbol, app_ticker))
         else:
             normal_pairs.append((ccxt_symbol, app_ticker))
             
+    # 3. Combine them: Priority pairs will be scanned first
     final_pairs_list = priority_pairs + normal_pairs
     
-    print(f"⭐ High Priority Pairs: {len(priority_pairs)} | Remaining: {len(normal_pairs)}")
+    print(f"⭐ High Priority Pairs to scan first: {len(priority_pairs)}")
+    print(f"📦 Remaining Pairs to scan next: {len(normal_pairs)}")
     print("⚡ Initiating EMA calculation matrix...")
     print("-" * 60)
     
     detected_count = 0
     telegram_sent_count = 0
     
+    # 4. Loop through the rearranged list
     for ccxt_symbol, app_ticker in final_pairs_list:
         time.sleep(0.05)
         setup = scan_momentum(ccxt_symbol, exchange, timeframe=target_tf)
+        
+        # if setup:
+        #     # Format the alert message with emojis and structure
+        #     alert_message = (
+        #         f"🚨 <b>DELTA ALERT</b> | {app_ticker}\n"
+        #         f"📊 {setup['type']}\n"
+        #         f"⏱️ <b>Timeframe:</b> {setup['timeframe']}\n"
+        #         f"💰 <b>Price:</b> {setup['close']:.4f}\n"
+        #         f"📈 <b>Volume:</b> {setup['volume']:.2f}\n"
+        #         f"🕐 <b>Time:</b> {setup['time']}"
+        #     )
 
         if setup:
+            # Format both the candle volume and the 24h rolling volume
             readable_volume = format_volume(setup['volume'])
             readable_24h_vol = format_volume(setup.get('vol_24h', 0.0))
             
+            # Format the alert message with emojis and structure
             alert_message = (
                 f"🚨 <b>DELTA ALERT</b> | {app_ticker}\n"
                 f"📊 {setup['type']}\n"
@@ -250,9 +310,11 @@ def main(target_tf='15m', silent_mode=False):
                 f"🕐 <b>Time:</b> {setup['time']}"
             )
             
+            # Print to console
             print(alert_message.replace('<b>', '').replace('</b>', ''))
             print("-" * 40)
             
+            # Send Telegram alert
             success = send_telegram_alert(alert_message)
             if success:
                 telegram_sent_count += 1
@@ -260,42 +322,43 @@ def main(target_tf='15m', silent_mode=False):
             detected_count += 1
     
     print("=" * 60)
-    print(f"✅ [{target_tf}] Scan complete! Setups found: {detected_count}")
+    print(f"✅ Scan complete!")
+    print(f"📊 Total setups found: {detected_count}")
+    print(f"📱 Telegram alerts sent: {telegram_sent_count}")
     print("=" * 60)
     
-    # Send summary message ONLY if setups were found, OR if it's the primary 15m run
-    if detected_count > 0 or not silent_mode:
-        summary = (
-            f"✅ <b>[{target_tf}] Scan Complete</b>\n"
-            f"📊 Found: {detected_count} setups\n"
-            f"📱 Sent: {telegram_sent_count} alerts\n"
-            f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S IST')}"
-        )
-        send_telegram_alert(summary)
+    # Send summary message
+    summary = (
+        f"✅ <b>Scan Complete</b>\n"
+        f"📊 Found: {detected_count} setups\n"
+        f"📱 Sent: {telegram_sent_count} alerts\n"
+        f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S IST')}"
+    )
+    send_telegram_alert(summary)
 
-
-# ========== MASTER CLOCK-GATED EXECUTION ENGINE ==========
 if __name__ == "__main__":
-    # 1. ALWAYS execute the 15m scan (Primary Pulse)
-    main(target_tf='15m', silent_mode=False)
-    
-    # Fetch current UTC server time
-    now_utc = datetime.now(timezone.utc)
-    
-    # 2. HOURLY GATE: Only run 1H scan if we are in the first 10 mins of an hour (e.g. 10:00 - 10:09 UTC)
-    if now_utc.minute < 10:
-        print("\n" + "★" * 60)
-        print("⏰ TOP OF THE HOUR DETECTED! INITIATING 1H TIMEFRAME SCAN...")
-        print("★" * 60)
-        
-        main(target_tf='1h', silent_mode=True)
-        
-        # 3. 4-HOUR GATE: Only run 4H scan on milestones (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
-        if now_utc.hour % 4 == 0:
-            print("\n" + "★" * 60)
-            print("🏛️ 4-HOUR CANDLE CLOSE DETECTED! INITIATING 4H TIMEFRAME SCAN...")
-            print("★" * 60)
-            
-            main(target_tf='4h', silent_mode=True)
+    main(target_tf='15m')
 
-    print("\n🏁 Master execution matrix finished successfully. Exiting.")
+# # For GithubActions
+# if __name__ == "__main__":
+#     # Continuous live loop structure for persistent web environments
+#     INTERVAL_SECONDS = 900 # 15 minutes
+    
+#     print("🌍 Hugging Face Container Engine Initialized Successfully.")
+#     while True:
+#         start_time = time.time()
+#         current_run_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S IST')
+#         print(f"🔄 Executing active scanning cycle at: {current_run_time}")
+        
+#         try:
+#             # Invokes your main matrix engine with 15-minute candles
+#             main(target_tf='15m')
+#         except Exception as e:
+#             print(f"⚠️ Runtime execution error caught in main loop iteration: {e}")
+            
+#         # Calculate process time to avoid interval drift
+#         elapsed_time = time.time() - start_time
+#         remaining_sleep = max(1, INTERVAL_SECONDS - elapsed_time)
+        
+#         print(f"😴 Cycle complete. Processing took {elapsed_time:.1f}s. Sleeping for {remaining_sleep:.1f}s...")
+#         time.sleep(remaining_sleep)
