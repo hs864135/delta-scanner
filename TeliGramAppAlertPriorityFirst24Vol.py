@@ -185,7 +185,7 @@ def scan_momentum(symbol, exchange, timeframe):
     return None
 
 # ========== MAIN FUNCTION WITH TELEGRAM INTEGRATION ==========
-def main(target_tf='15m', silent_mode=False):
+def main(target_tf='1h', silent_mode=False):
     exchange = ccxt.delta({
         'enableRateLimit': True,
         'urls': {
@@ -273,29 +273,49 @@ def main(target_tf='15m', silent_mode=False):
         )
         send_telegram_alert(summary)
 
-
 # ========== MASTER CLOCK-GATED EXECUTION ENGINE ==========
 if __name__ == "__main__":
-    # 1. ALWAYS execute the 15m scan (Primary Pulse)
-    main(target_tf='15m', silent_mode=False)
+    # 1. PRIMARY PULSE: Since cron runs hourly, 1H is now the main scan
+    main(target_tf='1h', silent_mode=False)
     
     # Fetch current UTC server time
     now_utc = datetime.now(timezone.utc)
     
-    # 2. HOURLY GATE: Only run 1H scan if we are in the first 10 mins of an hour (e.g. 10:00 - 10:09 UTC)
-    if now_utc.minute < 10:
+    # 2. 4-HOUR GATE: Only run 4H scan on milestones (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
+    if now_utc.hour % 4 == 0:
         print("\n" + "★" * 60)
-        print("⏰ TOP OF THE HOUR DETECTED! INITIATING 1H TIMEFRAME SCAN...")
+        print("🏛️ 4-HOUR CANDLE CLOSE DETECTED! INITIATING 4H TIMEFRAME SCAN...")
         print("★" * 60)
         
-        main(target_tf='1h', silent_mode=True)
-        
-        # 3. 4-HOUR GATE: Only run 4H scan on milestones (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
-        if now_utc.hour % 4 == 0:
-            print("\n" + "★" * 60)
-            print("🏛️ 4-HOUR CANDLE CLOSE DETECTED! INITIATING 4H TIMEFRAME SCAN...")
-            print("★" * 60)
-            
-            main(target_tf='4h', silent_mode=True)
+        main(target_tf='4h', silent_mode=True)
+
+    # Optional: If you still want to check 15m setups at the top of the hour, uncomment the line below:
+    # main(target_tf='15m', silent_mode=True)
 
     print("\n🏁 Master execution matrix finished successfully. Exiting.")
+
+# ========== MASTER CLOCK-GATED EXECUTION ENGINE (while running checking for 15min TF it also checks for 1hr and 4hr TF if fall in range)==========
+# if __name__ == "__main__":
+    # # 1. ALWAYS execute the 15m scan (Primary Pulse)
+    # main(target_tf='15m', silent_mode=False)
+    
+    # # Fetch current UTC server time
+    # now_utc = datetime.now(timezone.utc)
+    
+    # # 2. HOURLY GATE: Only run 1H scan if we are in the first 10 mins of an hour (e.g. 10:00 - 10:09 UTC)
+    # if now_utc.minute < 10:
+    #     print("\n" + "★" * 60)
+    #     print("⏰ TOP OF THE HOUR DETECTED! INITIATING 1H TIMEFRAME SCAN...")
+    #     print("★" * 60)
+        
+    #     main(target_tf='1h', silent_mode=True)
+        
+    #     # 3. 4-HOUR GATE: Only run 4H scan on milestones (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
+    #     if now_utc.hour % 4 == 0:
+    #         print("\n" + "★" * 60)
+    #         print("🏛️ 4-HOUR CANDLE CLOSE DETECTED! INITIATING 4H TIMEFRAME SCAN...")
+    #         print("★" * 60)
+            
+    #         main(target_tf='4h', silent_mode=True)
+
+    # print("\n🏁 Master execution matrix finished successfully. Exiting.")
